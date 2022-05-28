@@ -25,6 +25,8 @@ use openssl::{
 pub const DEFAULT_CERT_VALIDITY_DAYS: u64 = 825;
 pub const DEFAULT_RSA_KEY_LENGTH: u32 = 2048;
 
+pub type Result<T> = std::result::Result<T, PkiError>;
+
 #[derive(Debug, thiserror::Error)]
 pub enum PkiError {
     #[error(transparent)]
@@ -175,7 +177,7 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
-    pub fn build(&self) -> Result<(PKey<Private>, X509), PkiError> {
+    pub fn build(&self) -> Result<(PKey<Private>, X509)> {
         let cert_key = match self.key_type {
             PrivateKeyType::Rsa => PKey::from_rsa(Rsa::generate(DEFAULT_RSA_KEY_LENGTH)?)?,
             PrivateKeyType::Ec => PKey::from_ec_key(EcKey::generate(
@@ -227,14 +229,11 @@ impl<'a> CertificateBuilder<'a> {
             None,
             Some(&builder.x509v3_context(None, None)),
             "basicConstraints",
-            &format!(
-                "critical,CA:{}{}",
-                if self.usage.is_ca() { "TRUE" } else { "FALSE" },
-                match self.usage {
-                    CertUsage::Ca => format!(",pathlen:{}", self.path_len),
-                    _ => String::new(),
-                }
-            ),
+            &if self.usage.is_ca() {
+                format!("critical,CA:TRUE,pathlen:{}", self.path_len)
+            } else {
+                "critical,CA:FALSE".to_owned()
+            },
         )?)?;
 
         builder.append_extension(X509Extension::new(
@@ -287,7 +286,7 @@ impl<'a> CertificateBuilder<'a> {
         Ok((cert_key, cert))
     }
 
-    pub fn build_pkcs12(&self, password: &str, alias: &str) -> Result<Pkcs12, PkiError> {
+    pub fn build_pkcs12(&self, password: &str, alias: &str) -> Result<Pkcs12> {
         let (key, cert) = self.build()?;
 
         let mut pkcs12_builder = Pkcs12::builder();
@@ -343,7 +342,7 @@ impl<'a> CertificateVerifier<'a> {
         self
     }
 
-    pub fn verify(&self, cert: &X509Ref) -> Result<(), PkiError> {
+    pub fn verify(&self, cert: &X509Ref) -> Result<()> {
         let mut store_builder = X509StoreBuilder::new()?;
         if self.default_paths {
             store_builder.set_default_paths()?;
@@ -380,7 +379,7 @@ mod tests {
 
     const PASSWORD: &str = "changeit";
 
-    fn gen_ca_store(cn: &str, signer: Option<&ParsedPkcs12>) -> Result<Pkcs12, PkiError> {
+    fn gen_ca_store(cn: &str, signer: Option<&ParsedPkcs12>) -> Result<Pkcs12> {
         let mut builder = CertificateBuilder::new();
 
         if let Some(signer) = signer {
@@ -396,7 +395,7 @@ mod tests {
         builder.build_pkcs12(PASSWORD, "ca")
     }
 
-    fn gen_entity_store(signer: &ParsedPkcs12) -> Result<Pkcs12, PkiError> {
+    fn gen_entity_store(signer: &ParsedPkcs12) -> Result<Pkcs12> {
         let uuid = Uuid::new_v4();
         let mut builder = CertificateBuilder::new();
 
@@ -414,7 +413,7 @@ mod tests {
         builder.build_pkcs12(PASSWORD, &uuid.to_string())
     }
 
-    fn gen_chain() -> Result<(), PkiError> {
+    fn gen_chain() -> Result<()> {
         let root_store = gen_ca_store("Root CA", None)?;
         let root_signer = root_store.parse(PASSWORD)?;
 
