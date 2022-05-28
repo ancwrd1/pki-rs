@@ -15,8 +15,11 @@ use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
     rsa::Rsa,
-    stack::Stack,
-    x509::{X509Extension, X509Name, X509VerifyResult, X509},
+    stack::{Stack, StackRef},
+    x509::{
+        store::X509StoreBuilder, X509Extension, X509Name, X509Ref, X509StoreContext,
+        X509StoreContextRef, X509VerifyResult, X509,
+    },
 };
 
 pub const DEFAULT_CERT_VALIDITY_DAYS: u64 = 825;
@@ -80,6 +83,12 @@ pub struct CertificateBuilder<'a> {
     key_type: PrivateKeyType,
     serial_number: Option<u128>,
     path_len: i32,
+}
+
+impl<'a> Default for CertificateBuilder<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a> CertificateBuilder<'a> {
@@ -267,7 +276,7 @@ impl<'a> CertificateBuilder<'a> {
             )?)?;
         }
 
-        if let Some(ref signer) = self.signer {
+        if let Some(signer) = self.signer {
             builder.sign(&signer.pkey, MessageDigest::sha256())?;
         } else {
             builder.sign(&cert_key, MessageDigest::sha256())?;
@@ -283,7 +292,7 @@ impl<'a> CertificateBuilder<'a> {
 
         let mut pkcs12_builder = Pkcs12::builder();
 
-        if let Some(ref signer) = self.signer {
+        if let Some(signer) = self.signer {
             let mut stack = Stack::new()?;
             stack.push(signer.cert.clone())?;
 
@@ -298,9 +307,73 @@ impl<'a> CertificateBuilder<'a> {
     }
 }
 
+pub struct CertificateVerifier<'a> {
+    roots: Vec<X509>,
+    default_paths: bool,
+    chain: Option<&'a StackRef<X509>>,
+}
+
+impl<'a> Default for CertificateVerifier<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> CertificateVerifier<'a> {
+    pub fn new() -> Self {
+        Self {
+            roots: Vec::new(),
+            default_paths: true,
+            chain: None,
+        }
+    }
+
+    pub fn default_paths(&mut self, flag: bool) -> &mut Self {
+        self.default_paths = flag;
+        self
+    }
+
+    pub fn chain(&mut self, chain: &'a StackRef<X509>) -> &mut Self {
+        self.chain = Some(chain);
+        self
+    }
+
+    pub fn ca_root(&mut self, root: &X509Ref) -> &mut Self {
+        self.roots.push(root.to_owned());
+        self
+    }
+
+    pub fn verify(&self, cert: &X509Ref) -> Result<(), PkiError> {
+        let mut store_builder = X509StoreBuilder::new()?;
+        if self.default_paths {
+            store_builder.set_default_paths()?;
+        }
+        for root in &self.roots {
+            store_builder.add_cert(root.clone())?;
+        }
+        let store = store_builder.build();
+
+        let mut context = X509StoreContext::new()?;
+        let f = |context: &mut X509StoreContextRef| context.verify_cert();
+
+        let result = match self.chain {
+            Some(stack) => context.init(&store, cert, stack, f)?,
+            None => {
+                let empty = Stack::new()?;
+                context.init(&store, cert, &empty, f)?
+            }
+        };
+
+        if !result {
+            Err(PkiError::Verify(context.error()))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use openssl::x509::{store::X509StoreBuilder, X509StoreContext};
     use uuid::Uuid;
 
     use super::*;
@@ -320,7 +393,7 @@ mod tests {
             .not_after(SystemTime::now().add(Duration::from_secs(365 * 10 * 24 * 60 * 60)))
             .key_type(PrivateKeyType::Ec);
 
-        Ok(builder.build_pkcs12(PASSWORD, "ca")?)
+        builder.build_pkcs12(PASSWORD, "ca")
     }
 
     fn gen_entity_store(signer: &ParsedPkcs12) -> Result<Pkcs12, PkiError> {
@@ -333,41 +406,39 @@ mod tests {
                 ("O", "EveryonePrint"),
                 ("CN", &uuid.to_string()),
             ])
-            .signer(&signer)
+            .signer(signer)
             .usage(CertUsage::Client)
             .alt_names(["172.22.1.1", "t14s.home.lan"])
             .key_type(PrivateKeyType::Ec);
 
-        Ok(builder.build_pkcs12(PASSWORD, &uuid.to_string())?)
+        builder.build_pkcs12(PASSWORD, &uuid.to_string())
     }
 
     fn gen_chain() -> Result<(), PkiError> {
         let root_store = gen_ca_store("Root CA", None)?;
         let root_signer = root_store.parse(PASSWORD)?;
 
+        CertificateVerifier::new()
+            .ca_root(&root_signer.cert)
+            .verify(&root_signer.cert)?;
+
         let intermediate_store = gen_ca_store("Intermediate CA", Some(&root_signer))?;
         let intermediate_signer = intermediate_store.parse(PASSWORD)?;
+
+        CertificateVerifier::new()
+            .ca_root(&root_signer.cert)
+            .verify(&intermediate_signer.cert)?;
 
         let entity_store = gen_entity_store(&intermediate_signer)?;
         //std::fs::write("/tmp/keystore.p12", entity_store.to_der()?)?;
         let entity = entity_store.parse(PASSWORD)?;
 
-        let mut store_builder = X509StoreBuilder::new()?;
-        store_builder.set_default_paths()?;
-        store_builder.add_cert(root_signer.cert)?;
-        let store = store_builder.build();
+        CertificateVerifier::new()
+            .ca_root(&root_signer.cert)
+            .chain(&entity.chain.unwrap())
+            .verify(&entity.cert)?;
 
-        let mut context = X509StoreContext::new()?;
-        let verify_result =
-            context.init(&store, &entity.cert, &entity.chain.unwrap(), |context| {
-                context.verify_cert()
-            })?;
-
-        if !verify_result {
-            Err(PkiError::Verify(context.error()))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     #[test]
