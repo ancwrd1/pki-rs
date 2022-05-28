@@ -349,7 +349,7 @@ mod tests {
         let intermediate_signer = intermediate_store.parse(PASSWORD)?;
 
         let entity_store = gen_entity_store(&intermediate_signer)?;
-        std::fs::write("/tmp/keystore.p12", entity_store.to_der()?)?;
+        //std::fs::write("/tmp/keystore.p12", entity_store.to_der()?)?;
         let entity = entity_store.parse(PASSWORD)?;
 
         let mut store_builder = X509StoreBuilder::new()?;
