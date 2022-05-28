@@ -373,8 +373,6 @@ impl<'a> CertificateVerifier<'a> {
 
 #[cfg(test)]
 mod tests {
-    use uuid::Uuid;
-
     use super::*;
 
     const PASSWORD: &str = "changeit";
@@ -396,21 +394,21 @@ mod tests {
     }
 
     fn gen_entity_store(signer: &ParsedPkcs12) -> Result<Pkcs12> {
-        let uuid = Uuid::new_v4();
+        let cn = "mycert";
         let mut builder = CertificateBuilder::new();
 
         builder
             .subject([
                 ("C", "DK"),
                 ("O", "EveryonePrint"),
-                ("CN", &uuid.to_string()),
+                ("CN", cn),
             ])
             .signer(signer)
             .usage(CertUsage::Client)
             .alt_names(["172.22.1.1", "t14s.home.lan"])
             .key_type(PrivateKeyType::Ec);
 
-        builder.build_pkcs12(PASSWORD, &uuid.to_string())
+        builder.build_pkcs12(PASSWORD, cn)
     }
 
     fn gen_chain() -> Result<()> {

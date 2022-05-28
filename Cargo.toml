@@ -5,5 +5,4 @@ edition = "2021"
 
 [dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
-uuid = { version = "1", features = ["fast-rng", "v4"]}
 thiserror = "1"
