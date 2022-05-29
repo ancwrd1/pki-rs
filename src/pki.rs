@@ -9,7 +9,7 @@ use openssl::{
     bn::BigNum,
     hash::MessageDigest,
     stack::Stack,
-    x509::{store::X509StoreBuilder, X509Extension, X509StoreContext, X509StoreContextRef, X509},
+    x509::{store::X509StoreBuilder, X509Extension, X509StoreContext, X509},
 };
 
 use crate::model::{CertName, CertUsage, Certificate, KeyStore, PkiError, PrivateKey, Result};
@@ -277,12 +277,7 @@ impl<'a> CertificateVerifier<'a> {
             stack.push(cert.0.clone())?;
         }
 
-        let result = context.init(
-            &store,
-            &chain[0].0,
-            &stack,
-            |context: &mut X509StoreContextRef| context.verify_cert(),
-        )?;
+        let result = context.init(&store, &chain[0].0, &stack, |context| context.verify_cert())?;
 
         if !result {
             Err(PkiError::Verify(context.error()))

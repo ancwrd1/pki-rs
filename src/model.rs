@@ -1,7 +1,5 @@
-use std::borrow::Cow;
-use std::time::SystemTimeError;
+use std::{borrow::Cow, time::SystemTimeError};
 
-use openssl::x509::X509NameEntries;
 use openssl::{
     ec::{EcGroup, EcKey},
     error::ErrorStack,
@@ -10,7 +8,8 @@ use openssl::{
     pkey::{Id, PKey, Private},
     rsa::Rsa,
     stack::Stack,
-    x509::{X509Name, X509NameRef, X509VerifyResult, X509},
+    symm::Cipher,
+    x509::{X509Name, X509NameEntries, X509NameRef, X509VerifyResult, X509},
 };
 
 pub type Result<T> = std::result::Result<T, PkiError>;
@@ -84,6 +83,19 @@ impl PrivateKey {
 
     pub fn to_der(&self) -> Result<Vec<u8>> {
         Ok(self.0.private_key_to_der()?)
+    }
+
+    pub fn from_pkcs8(data: &[u8], password: &str) -> Result<Self> {
+        Ok(Self(PKey::private_key_from_pkcs8_passphrase(
+            data,
+            password.as_bytes(),
+        )?))
+    }
+
+    pub fn to_pkcs8(&self, password: &str) -> Result<Vec<u8>> {
+        Ok(self
+            .0
+            .private_key_to_pkcs8_passphrase(Cipher::aes_256_cbc(), password.as_bytes())?)
     }
 
     pub fn bits(&self) -> u32 {
