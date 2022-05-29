@@ -61,7 +61,22 @@ fn gen_chain() -> Result<()> {
     //std::fs::write("/tmp/keystore.p12", &pkcs12).unwrap();
     let parsed = KeyStore::from_pkcs12(&pkcs12, PASSWORD)?;
 
-    println!("{:#?}", parsed.certs()[0]);
+    println!("{:#?}", parsed.certs());
+
+    assert!(parsed.certs()[0]
+        .subject_name()
+        .entries()
+        .any(|(k, v)| k == "CN" && v == CN));
+
+    assert!(parsed.certs()[1]
+        .subject_name()
+        .entries()
+        .any(|(k, v)| k == "CN" && v == "Intermediate CA"));
+
+    assert!(parsed.certs()[2]
+        .subject_name()
+        .entries()
+        .any(|(k, v)| k == "CN" && v == "Root CA"));
 
     Ok(())
 }

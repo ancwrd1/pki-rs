@@ -247,7 +247,7 @@ impl KeyStore {
         let parsed = pkcs12.parse(password)?;
         let mut certs: Vec<Certificate> = vec![parsed.cert.into()];
         if let Some(chain) = parsed.chain {
-            certs.extend(chain.into_iter().map(Into::into));
+            certs.extend(chain.into_iter().rev().map(Into::into));
         }
         Ok(Self {
             private_key: PrivateKey(parsed.pkey),
