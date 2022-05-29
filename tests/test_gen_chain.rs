@@ -12,12 +12,12 @@ const CN: &str = "mycert";
 
 fn gen_ca_store(cn: &str, signer: Option<&KeyStore>) -> Result<KeyStore> {
     let mut builder = CertificateBuilder::new();
-    builder.signer(signer);
 
     let subject = CertName::new([("C", "US"), ("O", "Acme"), ("CN", cn)])?;
 
     builder
         .subject(subject)
+        .signer(signer)
         .usage(CertUsage::Ca)
         .not_after(SystemTime::now().add(Duration::from_secs(365 * 10 * 24 * 60 * 60)))
         .private_key(PrivateKey::new_ec()?);
