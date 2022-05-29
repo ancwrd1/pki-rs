@@ -1,90 +1,32 @@
 use std::{
-    io,
     net::Ipv4Addr,
     ops::Add,
-    time::{Duration, SystemTime, SystemTimeError},
+    time::{Duration, SystemTime},
 };
 
 use openssl::{
     asn1::{Asn1Integer, Asn1Time},
     bn::BigNum,
-    ec::{EcGroup, EcKey},
-    error::ErrorStack,
     hash::MessageDigest,
-    nid::Nid,
-    pkcs12::{ParsedPkcs12, Pkcs12},
-    pkey::{PKey, Private},
-    rsa::Rsa,
-    stack::{Stack, StackRef},
-    x509::{
-        store::X509StoreBuilder, X509Extension, X509Name, X509Ref, X509StoreContext,
-        X509StoreContextRef, X509VerifyResult, X509,
-    },
+    stack::Stack,
+    x509::{store::X509StoreBuilder, X509Extension, X509StoreContext, X509StoreContextRef, X509},
 };
+
+use crate::model::{CertName, CertUsage, Certificate, KeyStore, PkiError, PrivateKey, Result};
 
 pub const DEFAULT_CERT_VALIDITY_DAYS: u64 = 825;
 pub const DEFAULT_RSA_KEY_LENGTH: u32 = 2048;
 
-pub type Result<T> = std::result::Result<T, PkiError>;
-
-#[derive(Debug, thiserror::Error)]
-pub enum PkiError {
-    #[error(transparent)]
-    Openssl(#[from] ErrorStack),
-    #[error(transparent)]
-    SystemTime(#[from] SystemTimeError),
-    #[error(transparent)]
-    Verify(#[from] X509VerifyResult),
-    #[error(transparent)]
-    Io(#[from] io::Error),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub enum PrivateKeyType {
-    Rsa,
-    Ec,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub enum CertUsage {
-    Ca,
-    Server,
-    Client,
-}
-
-impl CertUsage {
-    pub fn extended_usage(&self) -> &'static str {
-        match self {
-            Self::Server => "serverAuth",
-            Self::Client => "clientAuth",
-            Self::Ca => "",
-        }
-    }
-
-    pub fn usage(&self) -> &'static str {
-        match self {
-            Self::Server | Self::Client => {
-                "digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment"
-            }
-            Self::Ca => "keyCertSign,cRLSign",
-        }
-    }
-
-    pub fn is_ca(&self) -> bool {
-        matches!(self, Self::Ca)
-    }
-}
-
 pub struct CertificateBuilder<'a> {
-    signer: Option<&'a ParsedPkcs12>,
-    names: Vec<(String, String)>,
+    signer: Option<&'a KeyStore>,
+    subject: Option<CertName>,
     usage: CertUsage,
     alt_names: String,
     not_before: SystemTime,
     not_after: SystemTime,
-    key_type: PrivateKeyType,
     serial_number: Option<u128>,
     path_len: i32,
+    private_key: Option<PrivateKey>,
 }
 
 impl<'a> Default for CertificateBuilder<'a> {
@@ -97,20 +39,20 @@ impl<'a> CertificateBuilder<'a> {
     pub fn new() -> Self {
         Self {
             signer: None,
-            names: Vec::new(),
+            subject: None,
             usage: CertUsage::Server,
             alt_names: String::new(),
             not_before: SystemTime::now(),
             not_after: SystemTime::now().add(Duration::from_secs(
                 DEFAULT_CERT_VALIDITY_DAYS * 24 * 60 * 60,
             )),
-            key_type: PrivateKeyType::Ec,
             serial_number: None,
             path_len: i32::MAX,
+            private_key: None,
         }
     }
 
-    pub fn signer(&mut self, signer: &'a ParsedPkcs12) -> &mut Self {
+    pub fn signer(&mut self, signer: &'a KeyStore) -> &mut Self {
         self.signer = Some(signer);
         self
     }
@@ -149,21 +91,13 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
-    pub fn key_type(&mut self, key_type: PrivateKeyType) -> &mut Self {
-        self.key_type = key_type;
+    pub fn private_key(&mut self, key: PrivateKey) -> &mut Self {
+        self.private_key = Some(key);
         self
     }
 
-    pub fn subject<F, V, I>(&mut self, names: I) -> &mut Self
-    where
-        I: IntoIterator<Item = (F, V)>,
-        F: AsRef<str>,
-        V: AsRef<str>,
-    {
-        self.names = names
-            .into_iter()
-            .map(|(f, v)| (f.as_ref().to_owned(), v.as_ref().to_owned()))
-            .collect();
+    pub fn subject(&mut self, name: CertName) -> &mut Self {
+        self.subject = Some(name);
         self
     }
 
@@ -177,27 +111,28 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
-    pub fn build(&self) -> Result<(PKey<Private>, X509)> {
-        let cert_key = match self.key_type {
-            PrivateKeyType::Rsa => PKey::from_rsa(Rsa::generate(DEFAULT_RSA_KEY_LENGTH)?)?,
-            PrivateKeyType::Ec => PKey::from_ec_key(EcKey::generate(
-                EcGroup::from_curve_name(Nid::SECP256K1)?.as_ref(),
-            )?)?,
+    pub fn build(&self) -> Result<KeyStore> {
+        let cert_key = match self.private_key {
+            Some(ref private_key) => private_key.clone(),
+            None => PrivateKey::new_rsa(DEFAULT_RSA_KEY_LENGTH)?,
         };
 
-        let mut name_builder = X509Name::builder()?;
-        for (field, value) in &self.names {
-            name_builder.append_entry_by_text(field, value)?;
-        }
-        let subject = name_builder.build();
+        let empty_name: CertName;
+        let subject = match self.subject.as_ref() {
+            Some(subject) => subject.0.as_ref(),
+            None => {
+                empty_name = CertName::new([] as [(&str, &str); 0])?;
+                empty_name.0.as_ref()
+            }
+        };
 
         let mut builder = X509::builder()?;
-        builder.set_pubkey(&cert_key)?;
+        builder.set_pubkey(&cert_key.0)?;
         builder.set_version(2)?;
         builder.set_issuer_name(
             self.signer
-                .map(|s| s.cert.subject_name())
-                .unwrap_or(&subject),
+                .map(|s| s.certs()[0].subject_name().into())
+                .unwrap_or(subject),
         )?;
         builder.set_not_before(
             Asn1Time::from_unix(
@@ -215,7 +150,7 @@ impl<'a> CertificateBuilder<'a> {
             )?
             .as_ref(),
         )?;
-        builder.set_subject_name(&subject)?;
+        builder.set_subject_name(subject)?;
 
         let serial_number = match self.serial_number {
             Some(number) => number.to_be_bytes(),
@@ -245,7 +180,7 @@ impl<'a> CertificateBuilder<'a> {
 
         builder.append_extension(X509Extension::new(
             None,
-            Some(&builder.x509v3_context(self.signer.map(|s| s.cert.as_ref()), None)),
+            Some(&builder.x509v3_context(self.signer.map(|s| s.certs()[0].0.as_ref()), None)),
             "authorityKeyIdentifier",
             "keyid,issuer",
         )?)?;
@@ -276,40 +211,25 @@ impl<'a> CertificateBuilder<'a> {
         }
 
         if let Some(signer) = self.signer {
-            builder.sign(&signer.pkey, MessageDigest::sha256())?;
+            builder.sign(&signer.private_key().0, MessageDigest::sha256())?;
         } else {
-            builder.sign(&cert_key, MessageDigest::sha256())?;
+            builder.sign(&cert_key.0, MessageDigest::sha256())?;
         }
 
-        let cert = builder.build();
-
-        Ok((cert_key, cert))
-    }
-
-    pub fn build_pkcs12(&self, password: &str, alias: &str) -> Result<Pkcs12> {
-        let (key, cert) = self.build()?;
-
-        let mut pkcs12_builder = Pkcs12::builder();
-
+        let mut certs: Vec<Certificate> = vec![builder.build().into()];
         if let Some(signer) = self.signer {
-            let mut stack = Stack::new()?;
-            stack.push(signer.cert.clone())?;
-
-            if let Some(ref signer_stack) = signer.chain {
-                for cert in signer_stack {
-                    stack.push(cert.to_owned())?;
-                }
+            for cert in signer.certs() {
+                certs.push(cert.clone());
             }
-            pkcs12_builder.ca(stack);
         }
-        Ok(pkcs12_builder.build(password, alias, &key, &cert)?)
+
+        KeyStore::new(cert_key, certs)
     }
 }
 
 pub struct CertificateVerifier<'a> {
-    roots: Vec<X509>,
+    roots: Vec<&'a Certificate>,
     default_paths: bool,
-    chain: Option<&'a StackRef<X509>>,
 }
 
 impl<'a> Default for CertificateVerifier<'a> {
@@ -323,7 +243,6 @@ impl<'a> CertificateVerifier<'a> {
         Self {
             roots: Vec::new(),
             default_paths: true,
-            chain: None,
         }
     }
 
@@ -332,114 +251,43 @@ impl<'a> CertificateVerifier<'a> {
         self
     }
 
-    pub fn chain(&mut self, chain: &'a StackRef<X509>) -> &mut Self {
-        self.chain = Some(chain);
+    pub fn ca_root(&mut self, root: &'a Certificate) -> &mut Self {
+        self.roots.push(root);
         self
     }
 
-    pub fn ca_root(&mut self, root: &X509Ref) -> &mut Self {
-        self.roots.push(root.to_owned());
-        self
-    }
+    pub fn verify(&self, chain: &[Certificate]) -> Result<()> {
+        if chain.is_empty() {
+            return Err(PkiError::InvalidParameters);
+        }
 
-    pub fn verify(&self, cert: &X509Ref) -> Result<()> {
         let mut store_builder = X509StoreBuilder::new()?;
         if self.default_paths {
             store_builder.set_default_paths()?;
         }
         for root in &self.roots {
-            store_builder.add_cert(root.clone())?;
+            store_builder.add_cert(root.0.clone())?;
         }
         let store = store_builder.build();
 
         let mut context = X509StoreContext::new()?;
-        let f = |context: &mut X509StoreContextRef| context.verify_cert();
 
-        let result = match self.chain {
-            Some(stack) => context.init(&store, cert, stack, f)?,
-            None => {
-                let empty = Stack::new()?;
-                context.init(&store, cert, &empty, f)?
-            }
-        };
+        let mut stack = Stack::new()?;
+        for cert in &chain[1..] {
+            stack.push(cert.0.clone())?;
+        }
+
+        let result = context.init(
+            &store,
+            &chain[0].0,
+            &stack,
+            |context: &mut X509StoreContextRef| context.verify_cert(),
+        )?;
 
         if !result {
             Err(PkiError::Verify(context.error()))
         } else {
             Ok(())
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const PASSWORD: &str = "changeit";
-
-    fn gen_ca_store(cn: &str, signer: Option<&ParsedPkcs12>) -> Result<Pkcs12> {
-        let mut builder = CertificateBuilder::new();
-
-        if let Some(signer) = signer {
-            builder.signer(signer);
-        }
-
-        builder
-            .subject([("C", "DK"), ("O", "EveryonePrint"), ("CN", cn)])
-            .usage(CertUsage::Ca)
-            .not_after(SystemTime::now().add(Duration::from_secs(365 * 10 * 24 * 60 * 60)))
-            .key_type(PrivateKeyType::Ec);
-
-        builder.build_pkcs12(PASSWORD, "ca")
-    }
-
-    fn gen_entity_store(signer: &ParsedPkcs12) -> Result<Pkcs12> {
-        let cn = "mycert";
-        let mut builder = CertificateBuilder::new();
-
-        builder
-            .subject([
-                ("C", "DK"),
-                ("O", "EveryonePrint"),
-                ("CN", cn),
-            ])
-            .signer(signer)
-            .usage(CertUsage::Client)
-            .alt_names(["172.22.1.1", "t14s.home.lan"])
-            .key_type(PrivateKeyType::Ec);
-
-        builder.build_pkcs12(PASSWORD, cn)
-    }
-
-    fn gen_chain() -> Result<()> {
-        let root_store = gen_ca_store("Root CA", None)?;
-        let root_signer = root_store.parse(PASSWORD)?;
-
-        CertificateVerifier::new()
-            .ca_root(&root_signer.cert)
-            .verify(&root_signer.cert)?;
-
-        let intermediate_store = gen_ca_store("Intermediate CA", Some(&root_signer))?;
-        let intermediate_signer = intermediate_store.parse(PASSWORD)?;
-
-        CertificateVerifier::new()
-            .ca_root(&root_signer.cert)
-            .verify(&intermediate_signer.cert)?;
-
-        let entity_store = gen_entity_store(&intermediate_signer)?;
-        //std::fs::write("/tmp/keystore.p12", entity_store.to_der()?)?;
-        let entity = entity_store.parse(PASSWORD)?;
-
-        CertificateVerifier::new()
-            .ca_root(&root_signer.cert)
-            .chain(&entity.chain.unwrap())
-            .verify(&entity.cert)?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_gen_chain() {
-        gen_chain().unwrap();
     }
 }
