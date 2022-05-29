@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::time::SystemTimeError;
 
+use openssl::x509::X509NameEntries;
 use openssl::{
     ec::{EcGroup, EcKey},
     error::ErrorStack,
@@ -155,7 +157,7 @@ impl CertName {
         Ok(Self(name))
     }
 
-    pub fn entries(&self) -> Vec<(String, String)> {
+    pub fn entries(&self) -> CertNameEntries {
         CertNameRef(self.0.as_ref()).entries()
     }
 }
@@ -176,15 +178,8 @@ impl From<X509Name> for CertName {
 pub struct CertNameRef<'a>(pub(crate) &'a X509NameRef);
 
 impl<'a> CertNameRef<'a> {
-    pub fn entries(&self) -> Vec<(String, String)> {
-        let mut result = Vec::new();
-        for entry in self.0.entries() {
-            result.push((
-                entry.object().to_string(),
-                String::from_utf8_lossy(entry.data().as_slice()).into_owned(),
-            ));
-        }
-        result
+    pub fn entries(&self) -> CertNameEntries<'a> {
+        CertNameEntries(self.0.entries())
     }
 }
 
@@ -197,6 +192,20 @@ impl<'a> From<CertNameRef<'a>> for &'a X509NameRef {
 impl<'a> From<&'a X509NameRef> for CertNameRef<'a> {
     fn from(name: &'a X509NameRef) -> Self {
         Self(name)
+    }
+}
+
+pub struct CertNameEntries<'a>(X509NameEntries<'a>);
+
+impl<'a> Iterator for CertNameEntries<'a> {
+    type Item = (&'a str, Cow<'a, str>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let entry = self.0.next()?;
+        Some((
+            entry.object().nid().short_name().expect("No short name"),
+            String::from_utf8_lossy(entry.data().as_slice()),
+        ))
     }
 }
 
