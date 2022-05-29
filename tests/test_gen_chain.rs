@@ -12,10 +12,7 @@ const CN: &str = "mycert";
 
 fn gen_ca_store(cn: &str, signer: Option<&KeyStore>) -> Result<KeyStore> {
     let mut builder = CertificateBuilder::new();
-
-    if let Some(signer) = signer {
-        builder.signer(signer);
-    }
+    builder.signer(signer);
 
     let subject = CertName::new([("C", "US"), ("O", "Acme"), ("CN", cn)])?;
 

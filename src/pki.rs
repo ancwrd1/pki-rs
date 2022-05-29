@@ -52,8 +52,11 @@ impl<'a> CertificateBuilder<'a> {
         }
     }
 
-    pub fn signer(&mut self, signer: &'a KeyStore) -> &mut Self {
-        self.signer = Some(signer);
+    pub fn signer<S>(&mut self, signer: S) -> &mut Self
+    where
+        S: Into<Option<&'a KeyStore>>,
+    {
+        self.signer = signer.into();
         self
     }
 
