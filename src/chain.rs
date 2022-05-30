@@ -1,3 +1,4 @@
+//! Certificate chain generation and validation
 use std::{
     net::Ipv4Addr,
     ops::Add,
@@ -14,9 +15,13 @@ use openssl::{
 
 use crate::model::{CertName, CertUsage, Certificate, KeyStore, PkiError, PrivateKey, Result};
 
+/// Default validity days of the entity certificate
 pub const DEFAULT_CERT_VALIDITY_DAYS: u64 = 825;
+
+/// Default RSA key size
 pub const DEFAULT_RSA_KEY_LENGTH: u32 = 2048;
 
+/// Certificate builder is used to create X.509 certificate chains
 pub struct CertificateBuilder<'a> {
     signer: Option<&'a KeyStore>,
     subject: Option<CertName>,
@@ -36,6 +41,7 @@ impl<'a> Default for CertificateBuilder<'a> {
 }
 
 impl<'a> CertificateBuilder<'a> {
+    /// Create a new certificate builder with default parameters
     pub fn new() -> Self {
         Self {
             signer: None,
@@ -52,6 +58,7 @@ impl<'a> CertificateBuilder<'a> {
         }
     }
 
+    /// Specify certificate signer. If omitted or None a self-signed certificate is created.
     pub fn signer<S>(&mut self, signer: S) -> &mut Self
     where
         S: Into<Option<&'a KeyStore>>,
@@ -60,11 +67,14 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
+    /// Specify certificate usage
     pub fn usage(&mut self, usage: CertUsage) -> &mut Self {
         self.usage = usage;
         self
     }
 
+    /// Specify DNS or IP names for the subjectAltName extension.
+    /// This is a required setting for the TLS SNI matching.
     pub fn alt_names<S, I>(&mut self, alt_names: I) -> &mut Self
     where
         I: IntoIterator<Item = S>,
@@ -84,36 +94,44 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
+    /// Specify start date of the certificate
     pub fn not_before(&mut self, time: SystemTime) -> &mut Self {
         self.not_before = time;
         self
     }
 
+    /// Specify expiration date of the certificate
     pub fn not_after(&mut self, time: SystemTime) -> &mut Self {
         self.not_after = time;
         self
     }
 
+    /// Specify a custom private key for the certificate chain.
+    /// If not specified a default RSA-2048 key will be generated.
     pub fn private_key(&mut self, key: PrivateKey) -> &mut Self {
         self.private_key = Some(key);
         self
     }
 
+    /// Specify certificate subject
     pub fn subject(&mut self, name: CertName) -> &mut Self {
         self.subject = Some(name);
         self
     }
 
+    /// Specify serial number for the certificate, default is current Unix timestamp.
     pub fn serial_number(&mut self, number: u64) -> &mut Self {
         self.serial_number = Some(number as u128);
         self
     }
 
+    /// Specify pathlen parameter for CA certificate, default is i32::MAX
     pub fn path_len(&mut self, path_len: i32) -> &mut Self {
         self.path_len = path_len;
         self
     }
 
+    /// Create X.509 certificate chain
     pub fn build(&self) -> Result<KeyStore> {
         let cert_key = match self.private_key {
             Some(ref private_key) => private_key.clone(),
@@ -230,6 +248,7 @@ impl<'a> CertificateBuilder<'a> {
     }
 }
 
+/// Certificate chain verifier
 pub struct CertificateVerifier<'a> {
     roots: Vec<&'a Certificate>,
     default_paths: bool,
@@ -242,6 +261,7 @@ impl<'a> Default for CertificateVerifier<'a> {
 }
 
 impl<'a> CertificateVerifier<'a> {
+    /// Create new verifier instance
     pub fn new() -> Self {
         Self {
             roots: Vec::new(),
@@ -249,16 +269,19 @@ impl<'a> CertificateVerifier<'a> {
         }
     }
 
+    /// Enable standard trusted CA roots for validation, default is true
     pub fn default_paths(&mut self, flag: bool) -> &mut Self {
         self.default_paths = flag;
         self
     }
 
+    /// Specify a custom CA root certificate
     pub fn ca_root(&mut self, root: &'a Certificate) -> &mut Self {
         self.roots.push(root);
         self
     }
 
+    /// Verify a given certificate chain. The first element in the chain must be a leaf certificate.
     pub fn verify(&self, chain: &[Certificate]) -> Result<()> {
         if chain.is_empty() {
             return Err(PkiError::InvalidParameters);

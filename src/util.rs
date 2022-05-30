@@ -1,5 +1,8 @@
-use std::ops::Add;
-use std::time::{Duration, SystemTime};
+//! Utility functions
+use std::{
+    ops::Add,
+    time::{Duration, SystemTime},
+};
 
 use crate::{CertName, CertUsage, CertificateBuilder, KeyStore, PrivateKey, Result};
 
@@ -22,6 +25,8 @@ fn gen_entity_store(signer: &KeyStore, hostname: &str) -> Result<KeyStore> {
         .build()
 }
 
+/// Easily create a certificate chain to be used by TLS servers.
+/// The chain will contain two certificates: the leaf `hostname` certificate and `Root CA` root certificate.
 pub fn create_easy_server_chain(hostname: &str) -> Result<KeyStore> {
     let ca_store = gen_ca_store()?;
     gen_entity_store(&ca_store, hostname)
