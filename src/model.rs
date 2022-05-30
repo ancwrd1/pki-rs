@@ -83,10 +83,10 @@ impl PrivateKey {
         Ok(Self(PKey::from_rsa(Rsa::generate(bits)?)?))
     }
 
-    /// Create EC secp251k1 private key
+    /// Create EC secp384r1 private key
     pub fn new_ec() -> Result<Self> {
         Ok(Self(PKey::from_ec_key(EcKey::generate(
-            EcGroup::from_curve_name(Nid::SECP256K1)?.as_ref(),
+            EcGroup::from_curve_name(Nid::SECP384R1)?.as_ref(),
         )?)?))
     }
 

@@ -7,7 +7,7 @@ See `tests/test_gen_chain.rs` and `examples/tls-server.rs` for detailed examples
 
 ## Server example (native-tls)
 
-```rust,no_run
+```rust,no_run,ignore
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let key_store = pki::util::create_easy_server_chain(HOSTNAME)?;
     let pkcs8 = key_store.to_pkcs8()?;
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Client example (native-tls)
 
-```rust,no_run
+```rust,no_run,ignore
 fn client(key_store: &KeyStore) -> Result<(), Box<dyn std::error::Error>> {
     let client = TcpStream::connect(format!("{}:{}", HOSTNAME, PORT))?;
     let connector = TlsConnector::builder()
