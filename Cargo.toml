@@ -16,6 +16,7 @@ thiserror = "1"
 
 [dev-dependencies]
 native-tls = "0.2"
+rustls = "0.20"
 
 [features]
 default = []
