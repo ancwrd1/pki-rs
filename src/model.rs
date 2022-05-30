@@ -85,17 +85,25 @@ impl PrivateKey {
         Ok(self.0.private_key_to_der()?)
     }
 
-    pub fn from_pkcs8(data: &[u8], password: &str) -> Result<Self> {
+    pub fn from_pkcs8_der(data: &[u8], password: &str) -> Result<Self> {
         Ok(Self(PKey::private_key_from_pkcs8_passphrase(
             data,
             password.as_bytes(),
         )?))
     }
 
-    pub fn to_pkcs8(&self, password: &str) -> Result<Vec<u8>> {
+    pub fn to_pkcs8_der(&self, password: &str) -> Result<Vec<u8>> {
         Ok(self
             .0
             .private_key_to_pkcs8_passphrase(Cipher::aes_256_cbc(), password.as_bytes())?)
+    }
+
+    pub fn from_pkcs8_pem(data: &[u8]) -> Result<Self> {
+        Ok(Self(PKey::private_key_from_pem(data)?))
+    }
+
+    pub fn to_pkcs8_pem(&self) -> Result<Vec<u8>> {
+        Ok(self.0.private_key_to_pem_pkcs8()?)
     }
 
     pub fn bits(&self) -> u32 {
@@ -131,8 +139,16 @@ impl Certificate {
         Ok(Self(X509::from_der(data)?))
     }
 
+    pub fn from_pem(data: &[u8]) -> Result<Self> {
+        Ok(Self(X509::from_pem(data)?))
+    }
+
     pub fn to_der(&self) -> Result<Vec<u8>> {
         Ok(self.0.to_der()?)
+    }
+
+    pub fn to_pem(&self) -> Result<Vec<u8>> {
+        Ok(self.0.to_pem()?)
     }
 
     pub fn subject_name(&self) -> CertNameRef {
@@ -255,14 +271,6 @@ impl KeyStore {
         })
     }
 
-    pub fn private_key(&self) -> &PrivateKey {
-        &self.private_key
-    }
-
-    pub fn certs(&self) -> &[Certificate] {
-        &self.certs
-    }
-
     pub fn to_pkcs12(&self, alias: &str, password: &str) -> Result<Vec<u8>> {
         let mut builder = Pkcs12::builder();
         if self.certs.len() > 1 {
@@ -275,5 +283,34 @@ impl KeyStore {
         Ok(builder
             .build(password, alias, &self.private_key.0, &self.certs[0].0)?
             .to_der()?)
+    }
+
+    pub fn from_pkcs8(data: &[u8]) -> Result<Self> {
+        let key = PrivateKey::from_pkcs8_pem(data)?;
+        let certs = X509::stack_from_pem(data)?
+            .into_iter()
+            .map(Into::into)
+            .collect();
+        Ok(Self {
+            private_key: key,
+            certs,
+        })
+    }
+
+    pub fn to_pkcs8(&self) -> Result<Vec<u8>> {
+        let mut result = self.private_key.to_pkcs8_pem()?;
+        for cert in &self.certs {
+            let pem = cert.to_pem()?;
+            result.extend(pem.into_iter());
+        }
+        Ok(result)
+    }
+
+    pub fn private_key(&self) -> &PrivateKey {
+        &self.private_key
+    }
+
+    pub fn certs(&self) -> &[Certificate] {
+        &self.certs
     }
 }

@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use pki_rs::{
+use pki::{
     CertName, CertUsage, CertificateBuilder, CertificateVerifier, KeyStore, PrivateKey, Result,
 };
 
@@ -52,17 +52,7 @@ fn gen_entity_store(signer: &KeyStore) -> Result<KeyStore> {
     Ok(store)
 }
 
-fn gen_chain() -> Result<()> {
-    let root_store = gen_ca_store("Root CA", None)?;
-    let intermediate_store = gen_ca_store("Intermediate CA", Some(&root_store))?;
-    let entity_store = gen_entity_store(&intermediate_store)?;
-
-    let pkcs12 = entity_store.to_pkcs12(CN, PASSWORD)?;
-    //std::fs::write("/tmp/keystore.p12", &pkcs12).unwrap();
-    let parsed = KeyStore::from_pkcs12(&pkcs12, PASSWORD)?;
-
-    println!("{:#?}", parsed.certs());
-
+fn assert_parsed(parsed: &KeyStore) {
     assert!(parsed.certs()[0]
         .subject_name()
         .entries()
@@ -77,6 +67,22 @@ fn gen_chain() -> Result<()> {
         .subject_name()
         .entries()
         .any(|(k, v)| k == "CN" && v == "Root CA"));
+}
+
+fn gen_chain() -> Result<()> {
+    let root_store = gen_ca_store("Root CA", None)?;
+    let intermediate_store = gen_ca_store("Intermediate CA", Some(&root_store))?;
+    let entity_store = gen_entity_store(&intermediate_store)?;
+
+    let pkcs12 = entity_store.to_pkcs12(CN, PASSWORD)?;
+    //std::fs::write("/tmp/keystore.p12", &pkcs12).unwrap();
+    let parsed = KeyStore::from_pkcs12(&pkcs12, PASSWORD)?;
+    assert_parsed(&parsed);
+
+    let pkcs8 = entity_store.to_pkcs8()?;
+    //std::fs::write("/tmp/keystore.pem", &pkcs8).unwrap();
+    let parsed = KeyStore::from_pkcs8(&pkcs8)?;
+    assert_parsed(&parsed);
 
     Ok(())
 }

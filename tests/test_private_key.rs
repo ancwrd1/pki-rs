@@ -1,12 +1,15 @@
-use pki_rs::{PrivateKey, PrivateKeyType};
+use pki::{PrivateKey, PrivateKeyType};
 
 fn do_test(key: PrivateKey) {
     let der = key.to_der().unwrap();
     let parsed = PrivateKey::from_der(&der).unwrap();
     assert_eq!(parsed.to_der().unwrap(), der);
 
-    let pkcs8 = key.to_pkcs8("test").unwrap();
-    PrivateKey::from_pkcs8(&pkcs8, "test").unwrap();
+    let pkcs8 = key.to_pkcs8_der("test").unwrap();
+    PrivateKey::from_pkcs8_der(&pkcs8, "test").unwrap();
+
+    let pkcs8 = key.to_pkcs8_pem().unwrap();
+    PrivateKey::from_pkcs8_pem(&pkcs8).unwrap();
 }
 
 #[test]

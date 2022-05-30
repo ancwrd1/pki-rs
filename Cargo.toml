@@ -1,11 +1,14 @@
 [package]
-name = "pki-rs"
+name = "pki"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 openssl = "0.10"
 thiserror = "1"
+
+[dev-dependencies]
+native-tls = "0.2"
 
 [features]
 default = []
