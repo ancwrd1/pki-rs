@@ -1,3 +1,4 @@
+use std::net::Shutdown;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
@@ -14,7 +15,8 @@ fn accept(server: TcpListener, acceptor: TlsAcceptor) -> Result<(), Box<dyn std:
         let mut buf = Vec::new();
         tls_stream.read_to_end(&mut buf)?;
         println!("{}", String::from_utf8_lossy(&buf));
-        tls_stream.shutdown()?;
+        tls_stream.get_ref().shutdown(Shutdown::Read)?;
+        tls_stream.write_all(b"pong")?;
     }
     Ok(())
 }
@@ -39,8 +41,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let mut tls_stream = connector.connect(HOSTNAME, client)?;
     tls_stream.write_all(b"ping")?;
-    tls_stream.shutdown()?;
-    tls_stream.read_to_end(&mut Vec::new())?;
+    tls_stream.get_ref().shutdown(Shutdown::Write)?;
+
+    let mut reply = Vec::new();
+    tls_stream.read_to_end(&mut reply)?;
+    println!("{}", String::from_utf8_lossy(&reply));
 
     Ok(())
 }
