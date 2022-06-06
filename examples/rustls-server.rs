@@ -14,10 +14,11 @@ const PORT: u16 = 8000;
 
 fn accept(
     server: TcpListener,
-    mut connection: ServerConnection,
+    config: Arc<ServerConfig>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for stream in server.incoming() {
         let mut stream = stream?;
+        let mut connection = ServerConnection::new(config.clone())?;
         let mut tls_stream = Stream::new(&mut connection, &mut stream);
         let mut buf = Vec::new();
         tls_stream.read_to_end(&mut buf)?;
@@ -45,11 +46,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PrivateKey(key_store.private_key().to_der()?),
         )?;
 
-    let connection = ServerConnection::new(Arc::new(server_config))?;
     let server = TcpListener::bind(format!("{}:{}", HOSTNAME, PORT))?;
 
     std::thread::spawn(move || {
-        let _ = accept(server, connection);
+        let _ = accept(server, Arc::new(server_config));
     });
 
     let mut cert_store = RootCertStore::empty();
