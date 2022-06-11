@@ -46,7 +46,7 @@ impl<'a> CertificateBuilder<'a> {
         Self {
             signer: None,
             subject: None,
-            usage: CertUsage::Server,
+            usage: CertUsage::TlsServer,
             alt_names: String::new(),
             not_before: SystemTime::now(),
             not_after: SystemTime::now().add(Duration::from_secs(
@@ -185,7 +185,7 @@ impl<'a> CertificateBuilder<'a> {
             None,
             Some(&builder.x509v3_context(None, None)),
             "basicConstraints",
-            &if self.usage.is_ca() {
+            &if self.usage == CertUsage::CA {
                 format!("critical,CA:TRUE,pathlen:{}", self.path_len)
             } else {
                 "critical,CA:FALSE".to_owned()
@@ -206,12 +206,13 @@ impl<'a> CertificateBuilder<'a> {
             "keyid,issuer",
         )?)?;
 
-        if !self.usage.is_ca() {
+        let extended_usage = self.usage.extended_usage();
+        if !extended_usage.is_empty() {
             builder.append_extension(X509Extension::new(
                 None,
                 Some(&builder.x509v3_context(None, None)),
                 "extendedKeyUsage",
-                &format!("critical,{}", self.usage.extended_usage()),
+                &format!("critical,{}", extended_usage),
             )?)?;
         }
 

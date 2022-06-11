@@ -18,7 +18,7 @@ fn gen_ca_store(cn: &str, signer: Option<&KeyStore>) -> Result<KeyStore> {
     builder
         .subject(subject)
         .signer(signer)
-        .usage(CertUsage::Ca)
+        .usage(CertUsage::CA)
         .not_after(SystemTime::now().add(Duration::from_secs(365 * 10 * 24 * 60 * 60)))
         .private_key(PrivateKey::new_ec()?);
 
@@ -39,7 +39,7 @@ fn gen_entity_store(signer: &KeyStore) -> Result<KeyStore> {
     builder
         .subject(subject)
         .signer(signer)
-        .usage(CertUsage::Client)
+        .usage(CertUsage::TlsClient)
         .alt_names(["192.168.1.1", "acme.home.lan"])
         .private_key(PrivateKey::new_ec()?);
 

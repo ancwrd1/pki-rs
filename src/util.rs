@@ -9,7 +9,7 @@ use crate::{CertName, CertUsage, CertificateBuilder, KeyStore, PrivateKey, Resul
 fn gen_ca_store() -> Result<KeyStore> {
     CertificateBuilder::new()
         .subject(CertName::new([("CN", "Root CA")])?)
-        .usage(CertUsage::Ca)
+        .usage(CertUsage::CA)
         .not_after(SystemTime::now().add(Duration::from_secs(365 * 10 * 24 * 60 * 60)))
         .private_key(PrivateKey::new_rsa(2048)?)
         .build()
@@ -19,7 +19,7 @@ fn gen_entity_store(signer: &KeyStore, hostname: &str) -> Result<KeyStore> {
     CertificateBuilder::new()
         .subject(CertName::new([("CN", hostname)])?)
         .signer(signer)
-        .usage(CertUsage::Server)
+        .usage(CertUsage::TlsServer)
         .alt_names([hostname])
         .private_key(PrivateKey::new_rsa(2048)?)
         .build()

@@ -42,34 +42,32 @@ pub enum PrivateKeyType {
 /// Certificate target usage
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum CertUsage {
-    Ca,
-    Server,
-    Client,
+    CA,
+    TlsServer,
+    TlsClient,
+    CodeSign,
 }
 
 impl CertUsage {
     /// Get the extended usage string
     pub fn extended_usage(&self) -> &'static str {
         match self {
-            Self::Server => "serverAuth",
-            Self::Client => "clientAuth",
-            Self::Ca => "",
+            Self::CA => "",
+            Self::TlsServer => "serverAuth",
+            Self::TlsClient => "clientAuth",
+            Self::CodeSign => "codeSigning",
         }
     }
 
     /// Get the usage string
     pub fn usage(&self) -> &'static str {
         match self {
-            Self::Server | Self::Client => {
+            Self::CA => "keyCertSign,cRLSign",
+            Self::TlsServer | Self::TlsClient => {
                 "digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment"
             }
-            Self::Ca => "keyCertSign,cRLSign",
+            Self::CodeSign => "digitalSignature,nonRepudiation",
         }
-    }
-
-    /// Return true if this is a CA certificate
-    pub fn is_ca(&self) -> bool {
-        matches!(self, Self::Ca)
     }
 }
 
