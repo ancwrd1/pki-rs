@@ -47,7 +47,7 @@
 <span class="kw">fn</span> <span class="ident">gen_ca_store</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KeyStore</span><span class="op">&gt;</span> {
     <span class="ident">CertificateBuilder::new</span>()
         .<span class="ident">subject</span>(<span class="ident">CertName::new</span>([(<span class="string">&quot;CN&quot;</span>, <span class="string">&quot;Root CA&quot;</span>)])<span class="question-mark">?</span>)
-        .<span class="ident">usage</span>(<span class="ident">CertUsage::Ca</span>)
+        .<span class="ident">usage</span>(<span class="ident">CertUsage::CA</span>)
         .<span class="ident">not_after</span>(<span class="ident">SystemTime::now</span>().<span class="ident">add</span>(<span class="ident">Duration::from_secs</span>(<span class="number">365</span> <span class="op">*</span> <span class="number">10</span> <span class="op">*</span> <span class="number">24</span> <span class="op">*</span> <span class="number">60</span> <span class="op">*</span> <span class="number">60</span>)))
         .<span class="ident">private_key</span>(<span class="ident">PrivateKey::new_rsa</span>(<span class="number">2048</span>)<span class="question-mark">?</span>)
         .<span class="ident">build</span>()
@@ -57,7 +57,7 @@
     <span class="ident">CertificateBuilder::new</span>()
         .<span class="ident">subject</span>(<span class="ident">CertName::new</span>([(<span class="string">&quot;CN&quot;</span>, <span class="ident">hostname</span>)])<span class="question-mark">?</span>)
         .<span class="ident">signer</span>(<span class="ident">signer</span>)
-        .<span class="ident">usage</span>(<span class="ident">CertUsage::Server</span>)
+        .<span class="ident">usage</span>(<span class="ident">CertUsage::TlsServer</span>)
         .<span class="ident">alt_names</span>([<span class="ident">hostname</span>])
         .<span class="ident">private_key</span>(<span class="ident">PrivateKey::new_rsa</span>(<span class="number">2048</span>)<span class="question-mark">?</span>)
         .<span class="ident">build</span>()

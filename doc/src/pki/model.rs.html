@@ -359,8 +359,6 @@
 <span id="354">354</span>
 <span id="355">355</span>
 <span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Model definitions</span>
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">borrow::Cow</span>, <span class="ident">time::SystemTimeError</span>};
 
@@ -405,34 +403,32 @@
 <span class="doccomment">/// Certificate target usage</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">PartialOrd</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CertUsage</span> {
-    <span class="ident">Ca</span>,
-    <span class="ident">Server</span>,
-    <span class="ident">Client</span>,
+    <span class="ident">CA</span>,
+    <span class="ident">TlsServer</span>,
+    <span class="ident">TlsClient</span>,
+    <span class="ident">CodeSign</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">CertUsage</span> {
     <span class="doccomment">/// Get the extended usage string</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">extended_usage</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Server</span> =&gt; <span class="string">&quot;serverAuth&quot;</span>,
-            <span class="ident"><span class="self">Self</span>::Client</span> =&gt; <span class="string">&quot;clientAuth&quot;</span>,
-            <span class="ident"><span class="self">Self</span>::Ca</span> =&gt; <span class="string">&quot;&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::CA</span> =&gt; <span class="string">&quot;&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::TlsServer</span> =&gt; <span class="string">&quot;serverAuth&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::TlsClient</span> =&gt; <span class="string">&quot;clientAuth&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::CodeSign</span> =&gt; <span class="string">&quot;codeSigning&quot;</span>,
         }
     }
 
     <span class="doccomment">/// Get the usage string</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">usage</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Server</span> <span class="op">|</span> <span class="ident"><span class="self">Self</span>::Client</span> =&gt; {
+            <span class="ident"><span class="self">Self</span>::CA</span> =&gt; <span class="string">&quot;keyCertSign,cRLSign&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::TlsServer</span> <span class="op">|</span> <span class="ident"><span class="self">Self</span>::TlsClient</span> =&gt; {
                 <span class="string">&quot;digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment&quot;</span>
             }
-            <span class="ident"><span class="self">Self</span>::Ca</span> =&gt; <span class="string">&quot;keyCertSign,cRLSign&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::CodeSign</span> =&gt; <span class="string">&quot;digitalSignature,nonRepudiation&quot;</span>,
         }
-    }
-
-    <span class="doccomment">/// Return true if this is a CA certificate</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_ca</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident"><span class="self">Self</span>::Ca</span>)
     }
 }
 
