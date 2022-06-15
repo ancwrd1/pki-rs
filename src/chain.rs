@@ -188,7 +188,7 @@ impl<'a> CertificateBuilder<'a> {
             &if self.usage == CertUsage::CA {
                 format!("critical,CA:TRUE,pathlen:{}", self.path_len)
             } else {
-                "critical,CA:FALSE".to_owned()
+                "CA:FALSE".to_owned()
             },
         )?)?;
 
@@ -212,7 +212,7 @@ impl<'a> CertificateBuilder<'a> {
                 None,
                 Some(&builder.x509v3_context(None, None)),
                 "extendedKeyUsage",
-                &format!("critical,{}", extended_usage),
+                &extended_usage,
             )?)?;
         }
 
