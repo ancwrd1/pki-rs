@@ -45,6 +45,7 @@ pub enum CertUsage {
     CA,
     TlsServer,
     TlsClient,
+    TlsServerAndClient,
     CodeSign,
 }
 
@@ -56,6 +57,7 @@ impl CertUsage {
             Self::TlsServer => "serverAuth",
             Self::TlsClient => "clientAuth",
             Self::CodeSign => "codeSigning",
+            Self::TlsServerAndClient => "serverAuth,clientAuth",
         }
     }
 
@@ -63,7 +65,7 @@ impl CertUsage {
     pub fn usage(&self) -> &'static str {
         match self {
             Self::CA => "keyCertSign,cRLSign",
-            Self::TlsServer | Self::TlsClient => {
+            Self::TlsServer | Self::TlsClient | Self::TlsServerAndClient => {
                 "digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment"
             }
             Self::CodeSign => "digitalSignature,nonRepudiation",
