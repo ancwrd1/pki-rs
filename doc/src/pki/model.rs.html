@@ -359,6 +359,11 @@
 <span id="354">354</span>
 <span id="355">355</span>
 <span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Model definitions</span>
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">borrow::Cow</span>, <span class="ident">time::SystemTimeError</span>};
 
@@ -406,6 +411,7 @@
     <span class="ident">CA</span>,
     <span class="ident">TlsServer</span>,
     <span class="ident">TlsClient</span>,
+    <span class="ident">TlsServerAndClient</span>,
     <span class="ident">CodeSign</span>,
 }
 
@@ -417,6 +423,7 @@
             <span class="ident"><span class="self">Self</span>::TlsServer</span> =&gt; <span class="string">&quot;serverAuth&quot;</span>,
             <span class="ident"><span class="self">Self</span>::TlsClient</span> =&gt; <span class="string">&quot;clientAuth&quot;</span>,
             <span class="ident"><span class="self">Self</span>::CodeSign</span> =&gt; <span class="string">&quot;codeSigning&quot;</span>,
+            <span class="ident"><span class="self">Self</span>::TlsServerAndClient</span> =&gt; <span class="string">&quot;serverAuth,clientAuth&quot;</span>,
         }
     }
 
@@ -424,7 +431,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">usage</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident"><span class="self">Self</span>::CA</span> =&gt; <span class="string">&quot;keyCertSign,cRLSign&quot;</span>,
-            <span class="ident"><span class="self">Self</span>::TlsServer</span> <span class="op">|</span> <span class="ident"><span class="self">Self</span>::TlsClient</span> =&gt; {
+            <span class="ident"><span class="self">Self</span>::TlsServer</span> <span class="op">|</span> <span class="ident"><span class="self">Self</span>::TlsClient</span> <span class="op">|</span> <span class="ident"><span class="self">Self</span>::TlsServerAndClient</span> =&gt; {
                 <span class="string">&quot;digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment&quot;</span>
             }
             <span class="ident"><span class="self">Self</span>::CodeSign</span> =&gt; <span class="string">&quot;digitalSignature,nonRepudiation&quot;</span>,
@@ -659,7 +666,10 @@
         <span class="kw">let</span> <span class="ident">parsed</span> <span class="op">=</span> <span class="ident">pkcs12</span>.<span class="ident">parse</span>(<span class="ident">password</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">certs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Certificate</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">parsed</span>.<span class="ident">cert</span>.<span class="ident">into</span>()];
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chain</span>) <span class="op">=</span> <span class="ident">parsed</span>.<span class="ident">chain</span> {
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">openssl_3_0</span>))]</span>
             <span class="ident">certs</span>.<span class="ident">extend</span>(<span class="ident">chain</span>.<span class="ident">into_iter</span>().<span class="ident">rev</span>().<span class="ident">map</span>(<span class="ident">Into::into</span>));
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">openssl_3_0</span>)]</span>
+            <span class="ident">certs</span>.<span class="ident">extend</span>(<span class="ident">chain</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="ident">Into::into</span>));
         }
         <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
             <span class="ident">private_key</span>: <span class="ident">PrivateKey</span>(<span class="ident">parsed</span>.<span class="ident">pkey</span>),
@@ -716,5 +726,5 @@
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pki" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0 (fe5b13d68 2022-05-18)" ></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pki" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.62.0 (a8314ef7d 2022-06-27)" ></div>
 </body></html>
