@@ -212,7 +212,7 @@ impl<'a> CertificateBuilder<'a> {
                 None,
                 Some(&builder.x509v3_context(None, None)),
                 "extendedKeyUsage",
-                &extended_usage,
+                extended_usage,
             )?)?;
         }
 
