@@ -31,7 +31,7 @@ pub enum PkiError {
 }
 
 /// Private key type
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd)]
 #[non_exhaustive]
 pub enum PrivateKeyType {
     Rsa,
@@ -40,7 +40,7 @@ pub enum PrivateKeyType {
 }
 
 /// Certificate target usage
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub enum CertUsage {
     CA,
     TlsServer,
