@@ -28,6 +28,8 @@ pub enum PkiError {
     Verify(#[from] X509VerifyResult),
     #[error("Invalid parameters")]
     InvalidParameters,
+    #[error("No private key in the store")]
+    MissingPrivateKey,
 }
 
 /// Private key type
@@ -297,18 +299,22 @@ impl KeyStore {
     /// Load key store from the PKCS12/PFX file
     pub fn from_pkcs12(data: &[u8], password: &str) -> Result<Self> {
         let pkcs12 = Pkcs12::from_der(data)?;
-        let parsed = pkcs12.parse(password)?;
-        let mut certs: Vec<Certificate> = vec![parsed.cert.into()];
-        if let Some(chain) = parsed.chain {
+        let parsed = pkcs12.parse2(password)?;
+        let mut certs: Vec<Certificate> = parsed.cert.into_iter().map(Into::into).collect();
+        if let Some(ca) = parsed.ca {
             #[cfg(not(openssl_3_0))]
             certs.extend(chain.into_iter().rev().map(Into::into));
             #[cfg(openssl_3_0)]
-            certs.extend(chain.into_iter().map(Into::into));
+            certs.extend(ca.into_iter().map(Into::into));
         }
-        Ok(Self {
-            private_key: PrivateKey(parsed.pkey),
-            certs,
-        })
+        if let Some(pkey) = parsed.pkey {
+            Ok(Self {
+                private_key: PrivateKey(pkey),
+                certs,
+            })
+        } else {
+            Err(PkiError::MissingPrivateKey)
+        }
     }
 
     /// Write key store to PKCS12/PFX file
@@ -321,9 +327,11 @@ impl KeyStore {
             }
             builder.ca(stack);
         }
-        Ok(builder
-            .build(password, alias, &self.private_key.0, &self.certs[0].0)?
-            .to_der()?)
+        builder
+            .name(alias)
+            .pkey(&self.private_key.0)
+            .cert(&self.certs[0].0);
+        Ok(builder.build2(password)?.to_der()?)
     }
 
     /// Load key store from PEM-encoded PKCS8 file which contains both private key and certificate chain
