@@ -303,7 +303,7 @@ impl KeyStore {
         let mut certs: Vec<Certificate> = parsed.cert.into_iter().map(Into::into).collect();
         if let Some(ca) = parsed.ca {
             #[cfg(not(openssl_3_0))]
-            certs.extend(chain.into_iter().rev().map(Into::into));
+            certs.extend(ca.into_iter().rev().map(Into::into));
             #[cfg(openssl_3_0)]
             certs.extend(ca.into_iter().map(Into::into));
         }
