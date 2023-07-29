@@ -20,7 +20,7 @@ fn gen_ca_store(cn: &str, signer: Option<&KeyStore>) -> Result<KeyStore> {
         .signer(signer)
         .usage(CertUsage::CA)
         .not_after(SystemTime::now().add(Duration::from_secs(365 * 10 * 24 * 60 * 60)))
-        .private_key(PrivateKey::new_ec()?);
+        .private_key(PrivateKey::new_ec(384)?);
 
     let store = builder.build()?;
 
@@ -41,7 +41,7 @@ fn gen_entity_store(signer: &KeyStore) -> Result<KeyStore> {
         .signer(signer)
         .usage(CertUsage::TlsClient)
         .alt_names(["192.168.1.1", "acme.home.lan"])
-        .private_key(PrivateKey::new_ec()?);
+        .private_key(PrivateKey::new_ec(256)?);
 
     let store = builder.build()?;
 
@@ -83,6 +83,8 @@ fn gen_chain() -> Result<()> {
     //std::fs::write("/tmp/keystore.pem", &pkcs8).unwrap();
     let parsed = KeyStore::from_pkcs8(&pkcs8)?;
     assert_parsed(&parsed);
+
+    std::fs::write("/tmp/chain.p8", &pkcs8).unwrap();
 
     Ok(())
 }

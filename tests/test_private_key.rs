@@ -14,8 +14,13 @@ fn do_test(key: PrivateKey) {
 
 #[test]
 fn test_private_key() {
-    let key = PrivateKey::new_ec().unwrap();
+    let key = PrivateKey::new_ec(384).unwrap();
     assert_eq!(key.bits(), 384);
+    assert_eq!(key.key_type(), PrivateKeyType::Ec);
+    do_test(key);
+
+    let key = PrivateKey::new_ec(256).unwrap();
+    assert_eq!(key.bits(), 256);
     assert_eq!(key.key_type(), PrivateKeyType::Ec);
     do_test(key);
 

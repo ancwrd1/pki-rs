@@ -85,10 +85,15 @@ impl PrivateKey {
         Ok(Self(PKey::from_rsa(Rsa::generate(bits)?)?))
     }
 
-    /// Create EC secp384r1 private key
-    pub fn new_ec() -> Result<Self> {
+    /// Create EC secp256r1 or secp384r1 private key
+    pub fn new_ec(bits: u32) -> Result<Self> {
+        let nid = match bits {
+            256 => Nid::X9_62_PRIME256V1, // alias for SECP256R1
+            384 => Nid::SECP384R1,
+            _ => return Err(PkiError::InvalidParameters),
+        };
         Ok(Self(PKey::from_ec_key(EcKey::generate(
-            EcGroup::from_curve_name(Nid::SECP384R1)?.as_ref(),
+            EcGroup::from_curve_name(nid)?.as_ref(),
         )?)?))
     }
 
