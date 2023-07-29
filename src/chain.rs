@@ -10,7 +10,7 @@ use openssl::{
     bn::BigNum,
     hash::MessageDigest,
     stack::Stack,
-    x509::{store::X509StoreBuilder, X509Extension, X509StoreContext, X509},
+    x509::{self, store::X509StoreBuilder, X509StoreContext, X509},
 };
 
 use crate::model::{CertName, CertUsage, Certificate, KeyStore, PkiError, PrivateKey, Result};
@@ -26,7 +26,7 @@ pub struct CertificateBuilder<'a> {
     signer: Option<&'a KeyStore>,
     subject: Option<CertName>,
     usage: CertUsage,
-    alt_names: String,
+    alt_names: Vec<String>,
     not_before: SystemTime,
     not_after: SystemTime,
     serial_number: Option<u128>,
@@ -47,7 +47,7 @@ impl<'a> CertificateBuilder<'a> {
             signer: None,
             subject: None,
             usage: CertUsage::TlsServer,
-            alt_names: String::new(),
+            alt_names: Vec::new(),
             not_before: SystemTime::now(),
             not_after: SystemTime::now().add(Duration::from_secs(
                 DEFAULT_CERT_VALIDITY_DAYS * 24 * 60 * 60,
@@ -82,15 +82,8 @@ impl<'a> CertificateBuilder<'a> {
     {
         self.alt_names = alt_names
             .into_iter()
-            .map(|name| {
-                if name.as_ref().parse::<Ipv4Addr>().is_ok() {
-                    format!("IP:{}", name.as_ref())
-                } else {
-                    format!("DNS:{}", name.as_ref())
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(",");
+            .map(|name| name.as_ref().to_owned())
+            .collect::<Vec<_>>();
         self
     }
 
@@ -181,55 +174,73 @@ impl<'a> CertificateBuilder<'a> {
         builder.set_serial_number(&asn_number)?;
 
         // man x509v3_config
-        builder.append_extension(X509Extension::new(
-            None,
-            Some(&builder.x509v3_context(None, None)),
-            "basicConstraints",
-            &if self.usage == CertUsage::CA {
-                format!("critical,CA:TRUE,pathlen:{}", self.path_len)
-            } else {
-                "CA:FALSE".to_owned()
-            },
-        )?)?;
+        let mut basic_cons = x509::extension::BasicConstraints::new();
 
-        builder.append_extension(X509Extension::new(
-            None,
-            Some(&builder.x509v3_context(None, None)),
-            "subjectKeyIdentifier",
-            "hash",
-        )?)?;
+        if self.usage == CertUsage::CA {
+            basic_cons.ca();
+        }
+        builder.append_extension(basic_cons.critical().pathlen(self.path_len as _).build()?)?;
 
-        builder.append_extension(X509Extension::new(
-            None,
-            Some(&builder.x509v3_context(self.signer.map(|s| s.certs()[0].0.as_ref()), None)),
-            "authorityKeyIdentifier",
-            "keyid,issuer",
-        )?)?;
+        let subj_key = x509::extension::SubjectKeyIdentifier::new()
+            .build(&builder.x509v3_context(None, None))?;
 
-        let extended_usage = self.usage.extended_usage();
-        if !extended_usage.is_empty() {
-            builder.append_extension(X509Extension::new(
-                None,
-                Some(&builder.x509v3_context(None, None)),
-                "extendedKeyUsage",
-                extended_usage,
-            )?)?;
+        builder.append_extension(subj_key)?;
+
+        let auth_key = x509::extension::AuthorityKeyIdentifier::new()
+            .keyid(false)
+            .issuer(false)
+            .build(&builder.x509v3_context(self.signer.map(|s| s.certs()[0].0.as_ref()), None))?;
+
+        builder.append_extension(auth_key)?;
+
+        if self.usage != CertUsage::CA {
+            let mut extended_key_usage = x509::extension::ExtendedKeyUsage::new();
+            match self.usage {
+                CertUsage::TlsServer => {
+                    extended_key_usage.server_auth();
+                }
+                CertUsage::TlsClient => {
+                    extended_key_usage.client_auth();
+                }
+                CertUsage::CodeSign => {
+                    extended_key_usage.code_signing();
+                }
+                CertUsage::TlsServerAndClient => {
+                    extended_key_usage.server_auth().client_auth();
+                }
+                _ => {}
+            }
+            builder.append_extension(extended_key_usage.build()?)?;
         }
 
-        builder.append_extension(X509Extension::new(
-            None,
-            Some(&builder.x509v3_context(None, None)),
-            "keyUsage",
-            &format!("critical,{}", self.usage.usage()),
-        )?)?;
+        let mut key_usage = x509::extension::KeyUsage::new();
+        match self.usage {
+            CertUsage::CA => {
+                key_usage.key_cert_sign().crl_sign();
+            }
+            CertUsage::TlsServer | CertUsage::TlsClient | CertUsage::TlsServerAndClient => {
+                key_usage
+                    .digital_signature()
+                    .non_repudiation()
+                    .key_encipherment()
+                    .data_encipherment();
+            }
+            CertUsage::CodeSign => {
+                key_usage.digital_signature().non_repudiation();
+            }
+        }
+        builder.append_extension(key_usage.build()?)?;
 
         if !self.alt_names.is_empty() {
-            builder.append_extension(X509Extension::new(
-                None,
-                Some(&builder.x509v3_context(None, None)),
-                "subjectAltName",
-                &self.alt_names,
-            )?)?;
+            let mut subj_alt_name = x509::extension::SubjectAlternativeName::new();
+            for name in &self.alt_names {
+                if name.parse::<Ipv4Addr>().is_ok() {
+                    subj_alt_name.ip(name);
+                } else {
+                    subj_alt_name.dns(name);
+                }
+            }
+            builder.append_extension(subj_alt_name.build(&builder.x509v3_context(None, None))?)?;
         }
 
         if let Some(signer) = self.signer {
