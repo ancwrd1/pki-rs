@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_easy_server_chain","Easily create a certificate chain to be used by TLS servers. The chain will contain two certificates: the leaf `hostname` certificate and `Root CA` root certificate."]]});
+window.SIDEBAR_ITEMS = {"fn":["create_easy_server_chain"]};

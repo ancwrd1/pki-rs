@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["chain","Certificate chain generation and validation"],["model","Model definitions"],["util","Utility functions"]]});
+window.SIDEBAR_ITEMS = {"mod":["chain","model","util"]};
