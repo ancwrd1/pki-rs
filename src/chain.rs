@@ -177,9 +177,9 @@ impl<'a> CertificateBuilder<'a> {
         let mut basic_cons = x509::extension::BasicConstraints::new();
 
         if self.usage == CertUsage::CA {
-            basic_cons.ca();
+            basic_cons.ca().critical().pathlen(self.path_len as _);
         }
-        builder.append_extension(basic_cons.critical().pathlen(self.path_len as _).build()?)?;
+        builder.append_extension(basic_cons.build()?)?;
 
         let subj_key = x509::extension::SubjectKeyIdentifier::new()
             .build(&builder.x509v3_context(None, None))?;
