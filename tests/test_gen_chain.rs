@@ -84,7 +84,7 @@ fn gen_chain() -> Result<()> {
     let parsed = KeyStore::from_pkcs8(&pkcs8)?;
     assert_parsed(&parsed);
 
-    std::fs::write("/tmp/chain.p8", &pkcs8).unwrap();
+    //std::fs::write("/tmp/chain.p8", &pkcs8).unwrap();
 
     Ok(())
 }
