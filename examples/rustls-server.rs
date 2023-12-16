@@ -5,9 +5,9 @@ use std::{
 };
 
 use rustls::{
-    Certificate, ClientConfig, ClientConnection, PrivateKey, RootCertStore, ServerConfig,
-    ServerConnection, Stream,
+    ClientConfig, ClientConnection, RootCertStore, ServerConfig, ServerConnection, Stream,
 };
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer};
 
 const HOSTNAME: &str = "localhost";
 const PORT: u16 = 8000;
@@ -20,8 +20,8 @@ fn accept(
         let mut stream = stream?;
         let mut connection = ServerConnection::new(config.clone())?;
         let mut tls_stream = Stream::new(&mut connection, &mut stream);
-        let mut buf = Vec::new();
-        tls_stream.read_to_end(&mut buf)?;
+        let mut buf = vec![0u8; 4];
+        tls_stream.read_exact(&mut buf)?;
         println!("{}", String::from_utf8_lossy(&buf));
         tls_stream.sock.shutdown(Shutdown::Read)?;
         tls_stream.write_all(b"pong")?;
@@ -33,17 +33,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let key_store = pki::util::create_easy_server_chain(HOSTNAME)?;
 
     let server_config = ServerConfig::builder()
-        .with_safe_default_cipher_suites()
-        .with_safe_default_kx_groups()
-        .with_safe_default_protocol_versions()?
         .with_no_client_auth()
         .with_single_cert(
             key_store
                 .certs()
                 .iter()
-                .map(|s| Certificate(s.to_der().unwrap()))
+                .map(|s| CertificateDer::from(s.to_der().unwrap()))
                 .collect(),
-            PrivateKey(key_store.private_key().to_der()?),
+            PrivateKeyDer::Pkcs1(PrivatePkcs1KeyDer::from(key_store.private_key().to_der()?)),
         )?;
 
     let server = TcpListener::bind(format!("{}:{}", HOSTNAME, PORT))?;
@@ -53,12 +50,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut cert_store = RootCertStore::empty();
-    cert_store.add(&Certificate(key_store.certs().last().unwrap().to_der()?))?;
+    cert_store.add(CertificateDer::from(
+        key_store.certs().last().unwrap().to_der()?,
+    ))?;
 
     let client_config = ClientConfig::builder()
-        .with_safe_default_cipher_suites()
-        .with_safe_default_kx_groups()
-        .with_safe_default_protocol_versions()?
         .with_root_certificates(cert_store)
         .with_no_client_auth();
 
@@ -69,8 +65,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tls_stream.write_all(b"ping")?;
     tls_stream.sock.shutdown(Shutdown::Write)?;
 
-    let mut reply = Vec::new();
-    tls_stream.read_to_end(&mut reply)?;
+    let mut reply = vec![0u8; 4];
+    tls_stream.read_exact(&mut reply)?;
     println!("{}", String::from_utf8_lossy(&reply));
 
     Ok(())
