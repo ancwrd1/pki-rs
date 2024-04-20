@@ -1,6 +1,6 @@
 [package]
 name = "pki"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Dmitry Pankratov <dmitry@pankratov.net>"]
 description = "Public key infrastructure tools for Rust"
 license = "MIT/Apache-2.0"
@@ -17,7 +17,7 @@ thiserror = "1"
 
 [dev-dependencies]
 native-tls = "0.2"
-rustls = "0.22"
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "ring"] }
 rustls-pki-types = "1"
 
 [features]
