@@ -34,7 +34,7 @@ pub struct CertificateBuilder<'a> {
     private_key: Option<PrivateKey>,
 }
 
-impl<'a> Default for CertificateBuilder<'a> {
+impl Default for CertificateBuilder<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -266,7 +266,7 @@ pub struct CertificateVerifier<'a> {
     default_paths: bool,
 }
 
-impl<'a> Default for CertificateVerifier<'a> {
+impl Default for CertificateVerifier<'_> {
     fn default() -> Self {
         Self::new()
     }

@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 #![doc = include_str!("../README.md")]
 
 pub mod chain;
