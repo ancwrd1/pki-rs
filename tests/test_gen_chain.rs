@@ -53,20 +53,26 @@ fn gen_entity_store(signer: &KeyStore) -> Result<KeyStore> {
 }
 
 fn assert_parsed(parsed: &KeyStore) {
-    assert!(parsed.certs()[0]
-        .subject_name()
-        .entries()
-        .any(|(k, v)| k == "CN" && v == CN));
+    assert!(
+        parsed.certs()[0]
+            .subject_name()
+            .entries()
+            .any(|(k, v)| k == "CN" && v == CN)
+    );
 
-    assert!(parsed.certs()[1]
-        .subject_name()
-        .entries()
-        .any(|(k, v)| k == "CN" && v == "Intermediate CA"));
+    assert!(
+        parsed.certs()[1]
+            .subject_name()
+            .entries()
+            .any(|(k, v)| k == "CN" && v == "Intermediate CA")
+    );
 
-    assert!(parsed.certs()[2]
-        .subject_name()
-        .entries()
-        .any(|(k, v)| k == "CN" && v == "Root CA"));
+    assert!(
+        parsed.certs()[2]
+            .subject_name()
+            .entries()
+            .any(|(k, v)| k == "CN" && v == "Root CA")
+    );
 }
 
 fn gen_chain() -> Result<()> {

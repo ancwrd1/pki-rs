@@ -10,7 +10,7 @@ use openssl::{
     bn::BigNum,
     hash::MessageDigest,
     stack::Stack,
-    x509::{self, store::X509StoreBuilder, X509StoreContext, X509},
+    x509::{self, X509, X509StoreContext, store::X509StoreBuilder},
 };
 
 use crate::model::{CertName, CertUsage, Certificate, KeyStore, PkiError, PrivateKey, Result};

@@ -10,7 +10,7 @@ use openssl::{
     rsa::Rsa,
     stack::Stack,
     symm::Cipher,
-    x509::{X509Name, X509NameEntries, X509NameRef, X509VerifyResult, X509},
+    x509::{X509, X509Name, X509NameEntries, X509NameRef, X509VerifyResult},
 };
 
 /// PKI result
