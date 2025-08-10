@@ -185,7 +185,7 @@ impl Certificate {
     }
 
     /// Get certificate subject name
-    pub fn subject_name(&self) -> CertNameRef {
+    pub fn subject_name(&self) -> CertNameRef<'_> {
         CertNameRef(self.0.subject_name())
     }
 }
@@ -223,7 +223,7 @@ impl CertName {
     }
 
     /// Return entries iterator
-    pub fn entries(&self) -> CertNameEntries {
+    pub fn entries(&self) -> CertNameEntries<'_> {
         CertNameRef(self.0.as_ref()).entries()
     }
 }
