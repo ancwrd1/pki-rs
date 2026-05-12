@@ -307,9 +307,6 @@ impl KeyStore {
         let parsed = pkcs12.parse2(password)?;
         let mut certs: Vec<Certificate> = parsed.cert.into_iter().map(Into::into).collect();
         if let Some(ca) = parsed.ca {
-            #[cfg(not(openssl_3_0))]
-            certs.extend(ca.into_iter().rev().map(Into::into));
-            #[cfg(openssl_3_0)]
             certs.extend(ca.into_iter().map(Into::into));
         }
         if let Some(pkey) = parsed.pkey {
@@ -357,7 +354,7 @@ impl KeyStore {
         let mut result = self.private_key.to_pkcs8_pem()?;
         for cert in &self.certs {
             let pem = cert.to_pem()?;
-            result.extend(pem.into_iter());
+            result.extend(pem);
         }
         Ok(result)
     }
